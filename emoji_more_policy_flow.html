@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insurance Run: Term | Endowment | ULIP</title>
+
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at top, #17223d, #050914 70%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        #gameWrapper {
+            position: relative;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow:
+                0 30px 70px rgba(0, 0, 0, 0.85),
+                0 0 45px rgba(0, 243, 255, 0.25);
+        }
+
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #050914, #15203a);
+        }
+
+        #uiLayer {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            pointer-events: none;
+        }
+
+        .hud-panel {
+            background: rgba(5, 10, 20, 0.68);
+            backdrop-filter: blur(14px);
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 243, 255, 0.18);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.12);
+            font-size: 14px;
+            line-height: 1.7;
+            letter-spacing: 0.5px;
+        }
+
+        .hud-title {
+            color: #00f3ff;
+            font-weight: 800;
+            font-size: 13px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .value {
+            color: #f1c40f;
+            font-weight: 800;
+        }
+
+        #controlsHint {
+            position: absolute;
+            bottom: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 9px 18px;
+            border-radius: 22px;
+            font-size: 14px;
+            color: #dfe6e9;
+            letter-spacing: 1px;
+            pointer-events: none;
+        }
+
+        #messageBanner {
+            position: absolute;
+            top: 112px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 243, 255, 0.12);
+            border: 1px solid rgba(0, 243, 255, 0.35);
+            color: #ffffff;
+            padding: 12px 22px;
+            border-radius: 30px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: none;
+            text-align: center;
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.28);
+            z-index: 5;
+        }
+
+        #gameOverScreen {
+            position: absolute;
+            inset: 0;
+            background: rgba(3, 6, 13, 0.94);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            padding: 35px;
+            z-index: 10;
+        }
+
+        #gameOverScreen h1 {
+            font-size: 46px;
+            margin: 0 0 12px;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+
+        #gameOverScreen p {
+            margin: 6px 0;
+            font-size: 20px;
+            color: #bdc3c7;
+        }
+
+        button {
+            margin-top: 25px;
+            padding: 15px 38px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #00f3ff, #0066ff);
+            color: white;
+            font-weight: 900;
+            letter-spacing: 2px;
+            cursor: pointer;
+            font-size: 17px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.35);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.55);
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="gameWrapper">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="uiLayer">
+        <div class="hud-panel">
+            <div class="hud-title">Protection Portfolio</div>
+            Family Protection: <span id="protectionDisplay" class="value">0%</span><br>
+            Savings Fund: <span id="savingsDisplay" class="value">₹0</span><br>
+            Wealth Fund: <span id="wealthDisplay" class="value">₹0</span>
+        </div>
+
+        <div class="hud-panel" style="text-align: right;">
+            <div class="hud-title">Game Score</div>
+            Score: <span id="scoreDisplay" class="value">₹0</span><br>
+            Active Policy: <span id="policyDisplay" class="value">None</span><br>
+            Lives: <span id="livesDisplay" class="value">1</span>
+        </div>
+    </div>
+
+    <div id="messageBanner"></div>
+
+    <div id="controlsHint">
+        SPACE / TAP: Jump | More policy flow + crisis gaps for smooth jumps
+    </div>
+
+    <div id="gameOverScreen">
+        <h1>Financial Crisis Hit</h1>
+        <p>Final Score: <span class="value">₹<span id="finalScore">0</span></span></p>
+        <p>Protection Built: <span class="value" id="finalProtection">0%</span></p>
+        <p>Savings Created: <span class="value">₹<span id="finalSavings">0</span></span></p>
+        <p>Wealth Created: <span class="value">₹<span id="finalWealth">0</span></span></p>
+        <button onclick="resetGame()">Restart Journey</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const logicalWidth = 1000;
+    const logicalHeight = 450;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.width = logicalWidth * dpr;
+    canvas.height = logicalHeight * dpr;
+    canvas.style.width = logicalWidth + "px";
+    canvas.style.height = logicalHeight + "px";
+
+    ctx.scale(dpr, dpr);
+
+    const scoreDisplay = document.getElementById("scoreDisplay");
+    const protectionDisplay = document.getElementById("protectionDisplay");
+    const savingsDisplay = document.getElementById("savingsDisplay");
+    const wealthDisplay = document.getElementById("wealthDisplay");
+    const policyDisplay = document.getElementById("policyDisplay");
+    const livesDisplay = document.getElementById("livesDisplay");
+    const messageBanner = document.getElementById("messageBanner");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+
+    const finalScore = document.getElementById("finalScore");
+    const finalProtection = document.getElementById("finalProtection");
+    const finalSavings = document.getElementById("finalSavings");
+    const finalWealth = document.getElementById("finalWealth");
+
+    let frames = 0;
+    let score = 0;
+    let gameSpeed = 6.2;
+    let gameOver = false;
+
+    let protection = 0;
+    let savingsFund = 0;
+    let wealthFund = 0;
+    let lives = 1;
+
+    let termShield = false;
+    let termTimer = 0;
+
+    let endowmentActive = false;
+    let endowmentTimer = 0;
+
+    let ulipActive = false;
+    let ulipTimer = 0;
+    let wealthMultiplier = 1;
+
+    let nextPolicyFrame = 70;
+    let nextRiskFrame = 150;
+    let nextCrisisWaveFrame = 760;
+    let crisisLevel = 1;
+
+    let roadOffset = 0;
+    let cityOffset = 0;
+    let mountainOffset = 0;
+
+    const groundY = logicalHeight - 60;
+
+    const stars = Array.from({ length: 70 }, () => ({
+        x: Math.random() * logicalWidth,
+        y: Math.random() * 230,
+        size: Math.random() * 1.5,
+        blink: Math.random() * 0.04 + 0.01
+    }));
+
+    const particles = [];
+
+    function showBanner(text) {
+        messageBanner.innerText = text;
+        messageBanner.style.display = "block";
+
+        setTimeout(() => {
+            messageBanner.style.display = "none";
+        }, 1800);
+    }
+
+    function money(value) {
+        return "₹" + Math.floor(value).toLocaleString();
+    }
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x;
+            this.y = y;
+            this.size = Math.random() * 4 + 2;
+            this.speedX = Math.random() * -2 - 1;
+            this.speedY = Math.random() * -2;
+            this.life = 1;
+            this.color = color;
+        }
+
+        update() {
+            this.x += this.speedX;
+            this.y += this.speedY;
+            this.life -= 0.025;
+            this.size += 0.08;
+        }
+
+        draw() {
+            ctx.fillStyle = `rgba(${this.color}, ${this.life})`;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    const player = {
+        x: 150,
+        y: groundY,
+        dy: 0,
+        gravity: 0.55,
+        jumpPower: -11.5,
+        grounded: true,
+
+        update() {
+            this.y += this.dy;
+
+            if (this.y >= groundY) {
+                this.y = groundY;
+                this.dy = 0;
+                this.grounded = true;
+            } else {
+                this.dy += this.gravity;
+                this.grounded = false;
+            }
+
+            this.draw();
+        },
+
+        jump() {
+            if (this.grounded) {
+                this.dy = this.jumpPower;
+                this.grounded = false;
+            }
+        },
+
+        draw() {
+            const runCycle = Math.sin(frames * 0.24);
+            const armCycle = Math.sin(frames * 0.24 + Math.PI);
+            const bounce = this.grounded ? Math.abs(runCycle) * 4 : 0;
+
+            ctx.save();
+            ctx.translate(this.x, this.y - bounce);
+
+            if (termShield) {
+                ctx.beginPath();
+                ctx.ellipse(0, -45, 58, 70, 0, 0, Math.PI * 2);
+
+                const shieldGrad = ctx.createRadialGradient(0, -45, 10, 0, -45, 70);
+                shieldGrad.addColorStop(0, "rgba(0, 243, 255, 0)");
+                shieldGrad.addColorStop(0.75, "rgba(0, 243, 255, 0.18)");
+                shieldGrad.addColorStop(1, "rgba(0, 243, 255, 0.75)");
+
+                ctx.fillStyle = shieldGrad;
+                ctx.fill();
+                ctx.strokeStyle = "#00f3ff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "#00f3ff";
+                ctx.font = "bold 12px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("TERM SHIELD", 0, -120);
+            }
+
+            if (endowmentActive) {
+                ctx.fillStyle = "rgba(46, 204, 113, 0.18)";
+                ctx.beginPath();
+                ctx.arc(0, -45, 45, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#2ecc71";
+                ctx.font = "bold 12px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("SAVINGS+", 0, -105);
+            }
+
+            if (ulipActive) {
+                ctx.strokeStyle = "#f1c40f";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(0, -45, 62, frames * 0.08, frames * 0.08 + Math.PI * 1.5);
+                ctx.stroke();
+
+                ctx.fillStyle = "#f1c40f";
+                ctx.font = "bold 12px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("ULIP 2X", 0, -135);
+            }
+
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath();
+            ctx.ellipse(0, 12 + bounce, 28, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = "#1e2f47";
+            ctx.lineWidth = 7;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            ctx.beginPath();
+            ctx.moveTo(-5, -22);
+            ctx.lineTo(-15 + runCycle * 12, -4);
+            ctx.lineTo(-26 + runCycle * 16, 8);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(5, -22);
+            ctx.lineTo(15 - runCycle * 12, -4);
+            ctx.lineTo(26 - runCycle * 16, 8);
+            ctx.stroke();
+
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.ellipse(-26 + runCycle * 16, 10, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.ellipse(26 - runCycle * 16, 10, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            const shirtGrad = ctx.createLinearGradient(-16, -62, 16, -20);
+            shirtGrad.addColorStop(0, "#00f3ff");
+            shirtGrad.addColorStop(1, "#005dff");
+
+            ctx.fillStyle = shirtGrad;
+            ctx.beginPath();
+            ctx.roundRect(-15, -62, 30, 42, 10);
+            ctx.fill();
+
+            ctx.fillStyle = "#f2c29b";
+            ctx.fillRect(-5, -70, 10, 10);
+
+            ctx.beginPath();
+            ctx.arc(0, -84, 14, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#111";
+            ctx.beginPath();
+            ctx.arc(0, -91, 14, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(5, -84, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = "#f2c29b";
+            ctx.lineWidth = 6;
+
+            ctx.beginPath();
+            ctx.moveTo(-12, -54);
+            ctx.lineTo(-27 + armCycle * 11, -37);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(12, -54);
+            ctx.lineTo(27 - armCycle * 11, -37);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    };
+
+    class Entity {
+        constructor(type) {
+            this.type = type;
+            this.x = logicalWidth + 40;
+            this.width = type === "riskDisaster" ? 62 : 48;
+            this.height = type === "riskDisaster" ? 62 : 48;
+            this.phase = Math.random() * Math.PI * 2;
+            this.marked = false;
+
+            if (type.startsWith("risk")) {
+                // Risks stay on the road
+                this.baseY = type === "riskDisaster" ? groundY - 58 : groundY - 45;
+            } else {
+                // Policies stay higher in the air, so the person must jump to collect
+                this.baseY = groundY - 150 - Math.random() * 45;
+            }
+
+            this.y = this.baseY;
+        }
+
+        update() {
+            this.x -= gameSpeed;
+
+            if (!this.type.startsWith("risk")) {
+                this.y = this.baseY + Math.sin(frames * 0.06 + this.phase) * 12;
+            }
+
+            this.draw();
+        }
+
+        draw() {
+            let color = "";
+            let text = "";
+            let icon = "";
+
+            if (this.type === "term") {
+                color = "0, 243, 255";
+                text = "TERM";
+                icon = "🛡";
+            } else if (this.type === "endowment") {
+                color = "46, 204, 113";
+                text = "SAVE";
+                icon = "₹";
+            } else if (this.type === "ulip") {
+                color = "241, 196, 15";
+                text = "ULIP";
+                icon = "↗";
+            } else if (this.type === "riskLoan") {
+                color = "231, 76, 60";
+                text = "LOAN";
+                icon = "!";
+            } else if (this.type === "riskMedical") {
+                color = "155, 89, 182";
+                text = "BILL";
+                icon = "+";
+            } else if (this.type === "riskFamily") {
+                color = "230, 126, 34";
+                text = "CRISIS";
+                icon = "!";
+            } else if (this.type === "riskMarket") {
+                color = "192, 57, 43";
+                text = "CRASH";
+                icon = "↓";
+            } else if (this.type === "riskJob") {
+                color = "52, 73, 94";
+                text = "JOB LOSS";
+                icon = "×";
+            } else if (this.type === "riskInflation") {
+                color = "243, 156, 18";
+                text = "INFLATION";
+                icon = "%";
+            } else if (this.type === "riskDisaster") {
+                color = "255, 0, 90";
+                text = "MEGA CRISIS";
+                icon = "⚠";
+            }
+
+            const centerX = this.x + 24;
+            const centerY = this.y + 24;
+
+            ctx.save();
+
+            const glow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 45);
+            glow.addColorStop(0, `rgba(${color}, 0.85)`);
+            glow.addColorStop(1, `rgba(${color}, 0)`);
+
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 48, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (this.type.startsWith("risk")) {
+                ctx.fillStyle = `rgba(${color}, 0.95)`;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY - 24);
+                ctx.lineTo(centerX + 24, centerY + 22);
+                ctx.lineTo(centerX - 24, centerY + 22);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 24px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(icon, centerX, centerY + 13);
+            } else {
+                ctx.fillStyle = `rgba(${color}, 0.95)`;
+                ctx.beginPath();
+                ctx.roundRect(centerX - 23, centerY - 23, 46, 46, 12);
+                ctx.fill();
+
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = "white";
+                ctx.font = "bold 24px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText(icon, centerX, centerY + 8);
+            }
+
+            ctx.fillStyle = `rgba(${color}, 1)`;
+            ctx.font = "bold 12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(text, centerX, centerY + 42);
+
+            ctx.restore();
+        }
+    }
+
+    const entities = [];
+
+    function drawEnvironment() {
+        stars.forEach(star => {
+            const opacity = Math.abs(Math.sin(frames * star.blink));
+            ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        ctx.fillStyle = "#101a2e";
+        mountainOffset = (mountainOffset - gameSpeed * 0.08) % 700;
+
+        ctx.beginPath();
+        ctx.moveTo(0, groundY);
+
+        for (let i = -200; i < logicalWidth + 800; i += 220) {
+            ctx.lineTo(i + mountainOffset, groundY - 130 - Math.sin(i) * 45);
+        }
+
+        ctx.lineTo(logicalWidth, groundY);
+        ctx.fill();
+
+        cityOffset = (cityOffset - gameSpeed * 0.35) % 320;
+
+        for (let i = -320; i < logicalWidth + 320; i += 75) {
+            let h = 70 + Math.abs(Math.sin(i * 2.4)) * 100;
+            let w = 35 + Math.abs(Math.cos(i)) * 22;
+
+            ctx.fillStyle = "#07101e";
+            ctx.fillRect(i + cityOffset, groundY - h, w, h);
+
+            ctx.fillStyle = "rgba(241, 196, 15, 0.38)";
+            ctx.fillRect(i + cityOffset + 10, groundY - h + 20, 5, 5);
+            ctx.fillRect(i + cityOffset + 24, groundY - h + 48, 5, 5);
+        }
+
+        ctx.fillStyle = "#1b1f28";
+        ctx.fillRect(0, groundY, logicalWidth, logicalHeight - groundY);
+
+        ctx.fillStyle = "#34495e";
+        ctx.fillRect(0, groundY, logicalWidth, 4);
+
+        roadOffset = (roadOffset - gameSpeed) % 160;
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
+
+        for (let i = -160; i < logicalWidth; i += 160) {
+            ctx.fillRect(i + roadOffset, groundY + 26, 85, 4);
+        }
+    }
+
+    function checkCollision(entity) {
+        const pLeft = player.x - 25;
+        const pRight = player.x + 25;
+        const pTop = player.y - 98;
+        const pBottom = player.y;
+
+        const eLeft = entity.x;
+        const eRight = entity.x + entity.width;
+        const eTop = entity.y;
+        const eBottom = entity.y + entity.height;
+
+        return pLeft < eRight && pRight > eLeft && pTop < eBottom && pBottom > eTop;
+    }
+
+    function collectPolicy(type) {
+        if (type === "term") {
+            termShield = true;
+            termTimer = frames + 420;
+            protection = Math.min(100, protection + 38);
+            score += 700;
+
+            showBanner("🛡 TERM INSURANCE ACTIVATED: Family Shield ON");
+
+            for (let i = 0; i < 18; i++) {
+                particles.push(new Particle(player.x, player.y - 50, "0,243,255"));
+            }
+        }
+
+        if (type === "endowment") {
+            endowmentActive = true;
+            endowmentTimer = frames + 460;
+            savingsFund += 2400;
+            protection = Math.min(100, protection + 14);
+            lives = Math.min(2, lives + 1);
+            score += 850;
+
+            showBanner("💰 ENDOWMENT POLICY: Savings + Extra Life Added");
+
+            for (let i = 0; i < 18; i++) {
+                particles.push(new Particle(player.x, player.y - 50, "46,204,113"));
+            }
+        }
+
+        if (type === "ulip") {
+            ulipActive = true;
+            ulipTimer = frames + 420;
+            wealthMultiplier = 2;
+            wealthFund += 3300;
+            score += 950;
+
+            showBanner("📈 ULIP ACTIVATED: Wealth Growth 2X");
+
+            for (let i = 0; i < 18; i++) {
+                particles.push(new Particle(player.x, player.y - 50, "241,196,15"));
+            }
+        }
+    }
+
+    function handleRisk(type) {
+        // Hard mode: every crisis also reduces score/funds, even when partially protected.
+        const crisisCost = {
+            riskMedical: 1300,
+            riskLoan: 1700,
+            riskFamily: 2400,
+            riskMarket: 1800,
+            riskJob: 2100,
+            riskInflation: 1200,
+            riskDisaster: 3800
+        };
+
+        score = Math.max(0, score - (crisisCost[type] || 1000));
+
+        if (termShield && (type === "riskFamily" || type === "riskLoan" || type === "riskJob")) {
+            termShield = false;
+            protection = Math.max(0, protection - 8);
+            showBanner("🛡 Term Insurance absorbed a major family crisis, but shield expired");
+            return;
+        }
+
+        if (endowmentActive && (type === "riskLoan" || type === "riskInflation")) {
+            savingsFund = Math.max(0, savingsFund - 1300);
+            showBanner("💰 Endowment savings reduced the crisis, but savings dropped");
+            return;
+        }
+
+        if (ulipActive && type === "riskMarket") {
+            wealthFund = Math.max(0, wealthFund - 1800);
+            wealthMultiplier = 1;
+            ulipActive = false;
+            showBanner("📉 Market crash damaged ULIP returns and stopped 2X growth");
+            return;
+        }
+
+        if (type === "riskDisaster") {
+            // Mega crisis is dangerous: it can cut through one life and damage every fund.
+            lives -= 2;
+            savingsFund = Math.max(0, savingsFund - 2200);
+            wealthFund = Math.max(0, wealthFund - 2600);
+            protection = Math.max(0, protection - 20);
+            showBanner("🚨 MEGA CRISIS! Protection, savings, and wealth were badly hit");
+        } else {
+            lives--;
+
+            if (type === "riskMedical") {
+                showBanner("🏥 Hospital bill hit! Health cover was needed");
+            } else if (type === "riskLoan") {
+                showBanner("🏦 Loan burden hit! EMI pressure increased");
+            } else if (type === "riskFamily") {
+                showBanner("👨‍👩‍👧 Family crisis hit! Term cover was needed");
+            } else if (type === "riskMarket") {
+                showBanner("📉 Market crash hit! Wealth fund reduced");
+            } else if (type === "riskJob") {
+                showBanner("💼 Job loss crisis hit! Emergency protection was needed");
+            } else if (type === "riskInflation") {
+                showBanner("📈 Inflation crisis hit! Savings value reduced");
+            }
+        }
+
+        if (lives <= 0) {
+            endGame();
+        }
+    }
+
+    function spawnCrisisWave() {
+        // Bigger wave spacing: gives player enough runway to jump, land, and jump again.
+        showBanner("🚨 Crisis Wave Incoming: multiple risks ahead!");
+        const waveRisks = ["riskLoan", "riskMedical", "riskJob", "riskInflation", "riskFamily"];
+        const count = Math.min(4, 2 + crisisLevel);
+
+        for (let i = 0; i < count; i++) {
+            const type = i === count - 1 && crisisLevel >= 3 ? "riskDisaster" : waveRisks[Math.floor(Math.random() * waveRisks.length)];
+            const ent = new Entity(type);
+            ent.x = logicalWidth + 240 + i * Math.max(260, 390 - crisisLevel * 10);
+            entities.push(ent);
+        }
+
+        crisisLevel++;
+        nextCrisisWaveFrame = frames + Math.max(820, 1120 - crisisLevel * 28);
+    }
+
+    function updateHUD() {
+        if (termShield) {
+            policyDisplay.innerText = "TERM SHIELD";
+            policyDisplay.style.color = "#00f3ff";
+        } else if (endowmentActive) {
+            policyDisplay.innerText = "ENDOWMENT SAVINGS";
+            policyDisplay.style.color = "#2ecc71";
+        } else if (ulipActive) {
+            policyDisplay.innerText = "ULIP 2X GROWTH";
+            policyDisplay.style.color = "#f1c40f";
+        } else {
+            policyDisplay.innerText = "None";
+            policyDisplay.style.color = "#95a5a6";
+        }
+
+        scoreDisplay.innerText = money(score);
+        protectionDisplay.innerText = protection + "%";
+        savingsDisplay.innerText = money(savingsFund);
+        wealthDisplay.innerText = money(wealthFund);
+        livesDisplay.innerText = lives;
+    }
+
+    function spawnPolicy() {
+        const rand = Math.random();
+
+        function addPolicy(type, extraX = 0, extraY = 0) {
+            const policy = new Entity(type);
+            policy.x += extraX;
+            policy.baseY += extraY;
+            policy.y = policy.baseY;
+            entities.push(policy);
+        }
+
+        if (rand < 0.34) {
+            addPolicy("term");
+        } else if (rand < 0.67) {
+            addPolicy("endowment");
+        } else {
+            addPolicy("ulip");
+        }
+
+        // More incoming flow: sometimes send a second benefit item after a safe gap.
+        if (Math.random() < 0.32) {
+            const bonusPolicies = ["term", "endowment", "ulip"];
+            const bonusType = bonusPolicies[Math.floor(Math.random() * bonusPolicies.length)];
+            addPolicy(bonusType, 150 + Math.random() * 90, Math.random() * 25 - 10);
+        }
+
+        // Faster policy arrival, but still enough time to jump and collect.
+        nextPolicyFrame = frames + Math.max(80, 155 - crisisLevel * 4) + Math.random() * 125;
+    }
+
+    function spawnRisk() {
+        const risks = ["riskLoan", "riskMedical", "riskFamily", "riskMarket", "riskJob", "riskInflation"];
+        let type = risks[Math.floor(Math.random() * risks.length)];
+
+        if (crisisLevel >= 4 && Math.random() < 0.12) {
+            type = "riskDisaster";
+        }
+
+        // Extra spacing between normal crisis obstacles: more fair for mobile/tablet jumping.
+        const riskTooClose = entities.some(e => e.type.startsWith("risk") && e.x > logicalWidth - 260);
+        if (riskTooClose) {
+            nextRiskFrame = frames + 85;
+            return;
+        }
+
+        entities.push(new Entity(type));
+
+        const minGap = Math.max(145, 245 - gameSpeed * 3 - crisisLevel);
+        nextRiskFrame = frames + minGap + Math.random() * Math.max(150, 260 - crisisLevel * 4);
+    }
+
+    function animate() {
+        if (gameOver) return;
+
+        ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+
+        frames++;
+
+        if (frames % 10 === 0) {
+            score += 18 * wealthMultiplier;
+
+            if (endowmentActive) {
+                savingsFund += 24;
+            }
+
+            if (ulipActive) {
+                wealthFund += 48 * wealthMultiplier;
+            }
+        }
+
+        // Rising cost of living: after the run becomes longer, small funds slowly drain.
+        if (frames > 900 && frames % 90 === 0) {
+            savingsFund = Math.max(0, savingsFund - 90);
+            wealthFund = Math.max(0, wealthFund - 70);
+        }
+
+        if (termShield && frames > termTimer) {
+            termShield = false;
+        }
+
+        if (endowmentActive && frames > endowmentTimer) {
+            endowmentActive = false;
+        }
+
+        if (ulipActive && frames > ulipTimer) {
+            ulipActive = false;
+            wealthMultiplier = 1;
+        }
+
+        if (frames % 430 === 0) {
+            gameSpeed += 0.55;
+        }
+
+        if (frames >= nextCrisisWaveFrame) {
+            spawnCrisisWave();
+        }
+
+        drawEnvironment();
+
+        if (frames >= nextPolicyFrame) {
+            spawnPolicy();
+        }
+
+        if (frames >= nextRiskFrame) {
+            spawnRisk();
+        }
+
+        for (let i = entities.length - 1; i >= 0; i--) {
+            const ent = entities[i];
+
+            ent.update();
+
+            if (checkCollision(ent)) {
+                const isPolicy =
+                    ent.type === "term" ||
+                    ent.type === "endowment" ||
+                    ent.type === "ulip";
+
+                if (isPolicy) {
+                    // Policy can be collected only while jumping
+                    if (!player.grounded) {
+                        collectPolicy(ent.type);
+                        ent.marked = true;
+                    }
+                } else {
+                    // Risks can hit anytime
+                    handleRisk(ent.type);
+                    ent.marked = true;
+                }
+            }
+
+            if (ent.x + ent.width < -80 || ent.marked) {
+                entities.splice(i, 1);
+            }
+        }
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            particles[i].draw();
+
+            if (particles[i].life <= 0) {
+                particles.splice(i, 1);
+            }
+        }
+
+        player.update();
+        updateHUD();
+
+        requestAnimationFrame(animate);
+    }
+
+    function endGame() {
+        gameOver = true;
+
+        finalScore.innerText = score.toLocaleString();
+        finalProtection.innerText = protection + "%";
+        finalSavings.innerText = Math.floor(savingsFund).toLocaleString();
+        finalWealth.innerText = Math.floor(wealthFund).toLocaleString();
+
+        gameOverScreen.style.display = "flex";
+    }
+
+    function resetGame() {
+        frames = 0;
+        score = 0;
+        gameSpeed = 6.2;
+        gameOver = false;
+
+        protection = 0;
+        savingsFund = 0;
+        wealthFund = 0;
+        lives = 1;
+
+        termShield = false;
+        endowmentActive = false;
+        ulipActive = false;
+
+        wealthMultiplier = 1;
+
+        nextPolicyFrame = 70;
+        nextRiskFrame = 165;
+        nextCrisisWaveFrame = 820;
+        crisisLevel = 1;
+
+        entities.length = 0;
+        particles.length = 0;
+
+        player.y = groundY;
+        player.dy = 0;
+        player.grounded = true;
+
+        gameOverScreen.style.display = "none";
+        messageBanner.style.display = "none";
+
+        animate();
+    }
+
+    window.addEventListener("keydown", function(e) {
+        if ((e.code === "Space" || e.code === "ArrowUp") && !gameOver) {
+            e.preventDefault();
+            player.jump();
+        }
+    });
+
+    document.addEventListener("mousedown", function(e) {
+        if (!gameOver && e.target.tagName !== "BUTTON") {
+            player.jump();
+        }
+    });
+
+    document.addEventListener("touchstart", function(e) {
+        if (!gameOver && e.target.tagName !== "BUTTON") {
+            e.preventDefault();
+            player.jump();
+        }
+    }, { passive: false });
+
+    animate();
+</script>
+
+</body>
+</html>
